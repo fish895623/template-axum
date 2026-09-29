@@ -1,23 +1,19 @@
-use std::net::SocketAddr;
-
+use template_axum::config::Config;
 use tokio::{net::TcpListener, signal};
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
-    template_axum::telemetry::init();
+async fn main() -> anyhow::Result<()> {
+    let config = Config::load()?;
+    template_axum::telemetry::init(config.log_format);
 
-    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".into());
-    let port = std::env::var("PORT").unwrap_or_else(|_| "3000".into());
-    let addr: SocketAddr = format!("{host}:{port}")
-        .parse()
-        .expect("HOST/PORT must form a valid socket address");
-
+    let addr = config.addr();
     let listener = TcpListener::bind(addr).await?;
     tracing::info!(%addr, "listening");
 
     axum::serve(listener, template_axum::app())
         .with_graceful_shutdown(shutdown_signal())
-        .await
+        .await?;
+    Ok(())
 }
 
 async fn shutdown_signal() {
